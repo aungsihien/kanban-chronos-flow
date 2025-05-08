@@ -52,6 +52,13 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
     }, 1000);
   };
 
+  const handleDemoLogin = () => {
+    if (mockUsers.length > 0) {
+      setEmail(mockUsers[0].email);
+      setPassword('password');
+    }
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-12 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900">
       <Card className="w-full max-w-md mx-auto shadow-lg">
@@ -100,10 +107,18 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
               />
             </div>
             
-            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 text-sm text-blue-700 rounded">
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 text-sm text-blue-700 rounded dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-700">
               <p><strong>Demo Credentials:</strong></p>
               <p>Email: alex@example.com</p>
               <p>Password: password</p>
+              <Button 
+                type="button" 
+                variant="link" 
+                className="p-0 h-auto text-blue-700 dark:text-blue-300" 
+                onClick={handleDemoLogin}
+              >
+                Fill demo credentials
+              </Button>
             </div>
           </CardContent>
           
