@@ -82,7 +82,7 @@ export const FilterBar = ({
               <SelectValue placeholder="Assignee" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Assignees</SelectItem>
+              <SelectItem value="all">All Assignees</SelectItem>
               {users.map((user) => (
                 <SelectItem key={user.id} value={user.id}>
                   {user.name}
@@ -107,7 +107,7 @@ export const FilterBar = ({
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Priorities</SelectItem>
+              <SelectItem value="all">All Priorities</SelectItem>
               {availablePriorities.map((priority) => (
                 <SelectItem key={priority} value={priority}>
                   {priority}
