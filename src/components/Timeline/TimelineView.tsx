@@ -11,7 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { format, addDays, startOfQuarter, endOfQuarter, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval } from 'date-fns';
+import { format, addDays, startOfQuarter, endOfQuarter, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO } from 'date-fns';
+import TaskDetail from '../UI/TaskDetail';
+import { ChevronRight, ChevronDown, X } from 'lucide-react';
+
 
 interface TimelineViewProps {
   tasks: Task[];
@@ -22,6 +25,17 @@ export const TimelineView = ({ tasks, users }: TimelineViewProps) => {
   const [scale, setScale] = useState<TimeScale>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentQuarter, setCurrentQuarter] = useState(getCurrentQuarter());
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'horizontal' | 'vertical'>('vertical');
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    'requirements': true,
+    'design': true,
+    'development': true,
+    'testing': true,
+    'promotion': true,
+  });
+  const [showNotes, setShowNotes] = useState(true);
   
   // Generate timeline units based on scale
   const generateTimelineUnits = () => {
@@ -117,6 +131,111 @@ export const TimelineView = ({ tasks, users }: TimelineViewProps) => {
     }
   };
 
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setDetailOpen(true);
+  };
+  
+  // Group tasks by section (using scope or tags)
+  const tasksBySection = {
+    'requirements': tasks.filter(task => 
+      task.scope?.toLowerCase().includes('requirement') || 
+      task.tags.includes('Research') ||
+      task.title.toLowerCase().includes('requirement')),
+    'design': tasks.filter(task => 
+      task.scope?.toLowerCase().includes('design') || 
+      task.tags.includes('Design') ||
+      task.title.toLowerCase().includes('design')),
+    'development': tasks.filter(task => 
+      task.scope?.toLowerCase().includes('development') || 
+      task.tags.includes('Feature') ||
+      task.title.toLowerCase().includes('development')),
+    'testing': tasks.filter(task => 
+      task.scope?.toLowerCase().includes('testing') || 
+      task.tags.includes('Testing') ||
+      task.title.toLowerCase().includes('test')),
+    'promotion': tasks.filter(task => 
+      task.scope?.toLowerCase().includes('promotion') || 
+      task.title.toLowerCase().includes('release') ||
+      task.title.toLowerCase().includes('launch')),
+  };
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const toggleNotes = () => {
+    setShowNotes(prev => !prev);
+  };
+
+  // Sort each section's tasks by deadline
+  Object.keys(tasksBySection).forEach(section => {
+    const sectionTasks = tasksBySection[section as keyof typeof tasksBySection];
+    sectionTasks.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+  });
+
+  // Section titles using proper capitalization
+  const sectionTitles: Record<string, string> = {
+    'requirements': 'Establish Requirements',
+    'design': 'Design & Wireframes',
+    'development': 'Development',
+    'testing': 'Testing & QA',
+    'promotion': 'Promotion & Launch'
+  };
+  
+  // Simple mapping of section names to user names
+  const sectionAssigneeMapping: Record<string, string> = {
+    'requirements': 'Maria Rodriguez',
+    'design': 'Katelyn Taylor',
+    'development': 'James Wilson',
+    'testing': 'Sarah Johnson',
+    'promotion': 'Michael Chen'
+  };
+  
+  // Notes for the sidebar
+  const sectionNotes: Record<string, string[]> = {
+    'requirements': [
+      'Establish key features',
+      'Get stakeholder feedback',
+      'Document requirements'
+    ],
+    'design': [
+      'Gather inspiration',
+      'Wireframe pages',
+      'Design mockups'
+    ],
+    'development': [
+      'Set up environment',
+      'Implement core features',
+      'Code review'
+    ],
+    'testing': [
+      'Unit testing',
+      'Integration testing',
+      'User acceptance'
+    ],
+    'promotion': [
+      'Prepare marketing materials',
+      'Social media announcements',
+      'Blog post'
+    ]
+  };
+  
+  // Format weeks for a month (for the vertical timeline)
+  const getWeeksInNovember = () => {
+    // Mocked weeks for November 2020 (example timeline)
+    return [
+      new Date(2020, 10, 1), // Nov 1
+      new Date(2020, 10, 8), // Nov 8
+      new Date(2020, 10, 15), // Nov 15
+      new Date(2020, 10, 22), // Nov 22
+      new Date(2020, 10, 29), // Nov 29
+    ];
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-4 mt-6 animate-fade-in">
       <div className="flex flex-wrap items-center justify-between mb-4 gap-2">
@@ -148,15 +267,18 @@ export const TimelineView = ({ tasks, users }: TimelineViewProps) => {
         </div>
       </div>
 
+
+      
       <div className="timeline-container overflow-x-auto pb-4">
-        <div className="min-w-[800px]">
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div className="font-medium">Task</div>
-            <div className="font-medium col-span-2">Timeline ({currentQuarter})</div>
+        <div className="min-w-[900px] flex flex-col">
+          <div className="flex mb-4">
+            <div className="w-[240px] font-medium">Task</div>
+            <div className="w-[240px] font-medium">Owner</div>
+            <div className="flex-1 font-medium">Timeline ({currentQuarter})</div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
+          <div className="flex">
+            <div className="w-[240px] space-y-2 pr-4">
               {tasks
                 .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
                 .map(task => (
@@ -166,8 +288,26 @@ export const TimelineView = ({ tasks, users }: TimelineViewProps) => {
                 ))
               }
             </div>
+            
+            <div className="w-[240px] space-y-2 pr-4">
+              {tasks
+                .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+                .map(task => (
+                  <div key={task.id} className="h-10 flex items-center text-sm truncate">
+                    {task.productOwner ? (
+                      <div className="flex items-center gap-1">
+                        <ProfileBadge user={task.productOwner} size="sm" showTooltip={true} />
+                        <span className="text-xs text-gray-600 dark:text-gray-400">{task.productOwner.name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 dark:text-gray-500">Unassigned</span>
+                    )}
+                  </div>
+                ))
+              }
+            </div>
 
-            <div className="relative col-span-2 border rounded-md">
+            <div className="flex-1 relative border rounded-md">
               {/* Timeline header */}
               <div className="flex border-b">
                 {timelineUnits.map((unit, index) => (
@@ -204,6 +344,7 @@ export const TimelineView = ({ tasks, users }: TimelineViewProps) => {
                       width: '120px',
                     }}
                     title={`${task.title} (Due: ${format(new Date(task.deadline), "MMM d")})`}
+                    onClick={() => handleTaskClick(task)}
                   >
                     <span className="truncate flex-1">
                       {scale === 'day' ? task.title.substring(0, 10) + '...' : task.title}
@@ -218,6 +359,13 @@ export const TimelineView = ({ tasks, users }: TimelineViewProps) => {
           </div>
         </div>
       </div>
+      
+      {/* Task Detail Dialog */}
+      <TaskDetail 
+        task={selectedTask} 
+        open={detailOpen} 
+        onOpenChange={setDetailOpen} 
+      />
     </div>
   );
 };

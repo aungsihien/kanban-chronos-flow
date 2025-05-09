@@ -12,15 +12,19 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { AlertCircle } from 'lucide-react';
 import ProfileBadge from '../UI/ProfileBadge';
 import { tagColorMap, priorityColorMap } from '../../data/mockData';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
+import TaskDetail from '../UI/TaskDetail';
+import TaskMoveConfirmation from '../UI/TaskMoveConfirmation';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface KanbanBoardProps {
   columns: KanbanColumn[];
   tasks: Task[];
-  onTaskMove: (taskId: string, newStatus: Status) => void;
+  onTaskMove: (taskId: string, newStatus: Status, comment?: string) => void;
 }
 
 export const KanbanBoard = ({
@@ -30,6 +34,10 @@ export const KanbanBoard = ({
 }: KanbanBoardProps) => {
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<Status | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [moveConfirmOpen, setMoveConfirmOpen] = useState(false);
+  const [moveToStatus, setMoveToStatus] = useState<Status | null>(null);
   const { toast } = useToast();
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
@@ -52,33 +60,33 @@ export const KanbanBoard = ({
     
     const task = tasks.find(t => t.id === taskId);
     if (task && task.status !== columnId) {
-      // Check WIP limits
-      const targetColumn = columns.find(c => c.id === columnId);
-      
-      if (targetColumn?.wipLimit && 
-          targetColumn.taskIds.length >= targetColumn.wipLimit) {
-        toast({
-          variant: "destructive",
-          title: "WIP Limit Exceeded",
-          description: `Column '${targetColumn.title}' has reached its WIP limit of ${targetColumn.wipLimit} tasks.`,
-          duration: 3000,
-        });
-      } else {
-        onTaskMove(taskId, columnId);
-        toast({
-          title: "Task Moved",
-          description: `Task moved to ${columnId}`,
-          duration: 2000,
-        });
-      }
+      // Instead of preventing the move, we'll show a confirmation dialog
+      setSelectedTask(task);
+      setMoveToStatus(columnId);
+      setMoveConfirmOpen(true);
     }
     
     setDragOverColumnId(null);
     setDraggingTaskId(null);
   };
+  
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setDetailOpen(true);
+  };
+  
+  const handleMoveConfirm = (taskId: string, newStatus: Status, comment: string) => {
+    onTaskMove(taskId, newStatus, comment);
+    toast({
+      title: "Task Moved",
+      description: `Task moved to ${newStatus}`,
+      duration: 2000,
+    });
+  };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 animate-fade-in overflow-x-auto">
+    <>
+      <div className="flex gap-4 animate-fade-in overflow-x-auto pb-4">
       {columns.map((column) => {
         const columnTasks = tasks.filter(task => column.taskIds.includes(task.id));
         const isOverWipLimit = column.wipLimit && columnTasks.length > column.wipLimit;
@@ -88,14 +96,19 @@ export const KanbanBoard = ({
           <div
             key={column.id}
             className={cn(
-              "kanban-column p-4 rounded-lg",
+              "kanban-column p-4 rounded-lg flex-shrink-0",
               dragOverColumnId === column.id && "drag-over border-primary border-2",
               "bg-white dark:bg-gray-800 border shadow-sm"
             )}
+            style={{ 
+              width: '280px', 
+              backgroundColor: column.color + '30',
+              transition: 'background-color 0.3s ease-in-out, border-color 0.3s ease-in-out'
+            }}
             onDragOver={(e) => handleDragOver(e, column.id)}
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, column.id)}
-            style={{ backgroundColor: column.color + '30' }} // Transparent version of column color
+            // Style moved to the div above
           >
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-lg">{column.title}</h3>
@@ -107,10 +120,33 @@ export const KanbanBoard = ({
                   )}
                 </span>
                 {column.wipLimit && isNearWipLimit && (
-                  <span className="wip-limit-warning">At Limit</span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300 ml-1">
+                          At Limit
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>This column has reached its WIP limit of {column.wipLimit} tasks.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
                 {column.wipLimit && isOverWipLimit && (
-                  <span className="wip-limit-exceeded">Over Limit</span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300 ml-1 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          Over Limit
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>This column exceeds its WIP limit of {column.wipLimit} tasks. Consider moving tasks to other columns.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
               </div>
             </div>
@@ -120,11 +156,12 @@ export const KanbanBoard = ({
                 <Card
                   key={task.id}
                   className={cn(
-                    "kanban-card border shadow-sm hover:shadow-md transition-all",
+                    "kanban-card border shadow-sm hover:shadow-md transition-all cursor-pointer w-full",
                     draggingTaskId === task.id && "dragging"
                   )}
                   draggable
                   onDragStart={(e) => handleDragStart(e, task.id)}
+                  onClick={() => handleTaskClick(task)}
                 >
                   <CardHeader className="p-3 pb-0">
                     <div className="flex justify-between items-start">
@@ -178,6 +215,24 @@ export const KanbanBoard = ({
         );
       })}
     </div>
+      
+      {/* Task Detail Dialog */}
+      <TaskDetail 
+        task={selectedTask} 
+        open={detailOpen} 
+        onOpenChange={setDetailOpen} 
+      />
+      
+      {/* Task Move Confirmation Dialog */}
+      <TaskMoveConfirmation
+        task={selectedTask}
+        fromStatus={selectedTask?.status || null}
+        toStatus={moveToStatus}
+        open={moveConfirmOpen}
+        onOpenChange={setMoveConfirmOpen}
+        onConfirm={handleMoveConfirm}
+      />
+    </>
   );
 };
 

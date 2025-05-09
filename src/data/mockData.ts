@@ -1,5 +1,5 @@
 
-import { Task, User, Status, KanbanColumn, Tag, Priority } from "../types";
+import { Task, User, Status, KanbanColumn, Tag, Priority, ProjectStatus, ActivityLogEntry, QuarterSummary } from "../types";
 
 // Mock users
 export const mockUsers: User[] = [
@@ -33,102 +33,169 @@ export const mockUsers: User[] = [
 export const currentUser = mockUsers[0];
 
 // Mock tasks
+// Generate mock activity log entries for a task
+const generateActivityLog = (taskId: string, user: User, createdAt: string): ActivityLogEntry[] => {
+  const createdDate = new Date(createdAt);
+  
+  return [
+    {
+      id: `log-${taskId}-1`,
+      taskId,
+      timestamp: createdDate.toISOString(),
+      type: 'created',
+      user,
+      newValue: 'Created task'
+    }
+  ];
+};
+
+// Generate time in status record
+const generateTimeInStatus = (): Record<Status, number> => {
+  return {
+    'Backlog': 0,
+    'In Progress': 0,
+    'Review': 0,
+    'Done': 0,
+    'Blocked': 0
+  };
+};
+
 export const mockTasks: Task[] = [
   {
     id: "t1",
     title: "Implement user authentication",
     description: "Set up secure login/logout functionality with JWT",
     status: "In Progress",
+    projectStatus: "Ongoing",
     priority: "High",
     assignee: mockUsers[0],
+    productOwner: mockUsers[0],
     tags: ["Feature"],
     deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
     createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 days ago
     updatedAt: new Date().toISOString(),
+    scope: "Authentication system for user login and session management",
+    activityLog: generateActivityLog("t1", mockUsers[0], new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()),
+    timeInStatus: generateTimeInStatus(),
   },
   {
     id: "t2",
     title: "Design product dashboard wireframes",
     description: "Create wireframes for the main product dashboard view",
     status: "Review",
+    projectStatus: "Ongoing",
     priority: "Medium",
     assignee: mockUsers[1],
+    productOwner: mockUsers[0],
     tags: ["Design"],
     deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days from now
     createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
     updatedAt: new Date().toISOString(),
+    scope: "UI/UX design for the main dashboard interface",
+    activityLog: generateActivityLog("t2", mockUsers[1], new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()),
+    timeInStatus: generateTimeInStatus(),
   },
   {
     id: "t3",
     title: "API rate limiting bug",
     description: "Fix rate limiting issue causing 429 errors during high traffic",
     status: "Backlog",
+    projectStatus: "Planned",
     priority: "High",
     assignee: mockUsers[2],
+    productOwner: mockUsers[2],
     tags: ["Bug"],
     deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days from now
     createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
     updatedAt: new Date().toISOString(),
+    scope: "Fix API rate limiting to prevent 429 errors during high traffic periods",
+    activityLog: generateActivityLog("t3", mockUsers[2], new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()),
+    timeInStatus: generateTimeInStatus(),
   },
   {
     id: "t4",
     title: "Update user documentation",
     description: "Update user guide with new feature descriptions",
     status: "Done",
+    projectStatus: "Done",
     priority: "Low",
     assignee: mockUsers[0],
+    productOwner: mockUsers[1],
     tags: ["Documentation"],
     deadline: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day ago (completed)
     createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days ago
     updatedAt: new Date().toISOString(),
+    scope: "Update all user documentation with descriptions of recently added features",
+    activityLog: generateActivityLog("t4", mockUsers[0], new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()),
+    timeInStatus: generateTimeInStatus(),
   },
   {
     id: "t5",
     title: "Explore payment gateway options",
     description: "Research payment gateway solutions for marketplace feature",
     status: "In Progress",
+    projectStatus: "Ongoing",
     priority: "Medium",
     assignee: mockUsers[1],
+    productOwner: mockUsers[0],
     tags: ["Research"],
     deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 days from now
     createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
     updatedAt: new Date().toISOString(),
+    scope: "Research and evaluate payment gateway options for the marketplace feature",
+    activityLog: generateActivityLog("t5", mockUsers[1], new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+    timeInStatus: generateTimeInStatus(),
   },
   {
     id: "t6",
     title: "Data migration script",
     description: "Create script for migrating legacy data to new database schema",
     status: "Blocked",
+    projectStatus: "Ongoing",
     priority: "High",
     assignee: mockUsers[2],
+    productOwner: mockUsers[2],
     tags: ["Feature"],
     deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days from now
     createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), // 20 days ago
     updatedAt: new Date().toISOString(),
+    scope: "Create migration scripts to move data from legacy system to new database schema",
+    activityLog: generateActivityLog("t6", mockUsers[2], new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString()),
+    timeInStatus: generateTimeInStatus(),
   },
   {
     id: "t7",
     title: "Mobile responsive design",
     description: "Ensure all components work well on mobile devices",
     status: "Backlog",
+    projectStatus: "Planned",
     priority: "Medium",
     assignee: mockUsers[0],
+    productOwner: mockUsers[1],
     tags: ["Design"],
     deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
     createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
     updatedAt: new Date().toISOString(),
+    scope: "Make all UI components responsive for mobile devices",
+    activityLog: generateActivityLog("t7", mockUsers[0], new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()),
+    timeInStatus: generateTimeInStatus(),
   },
   {
     id: "t8",
     title: "Unit test coverage",
     description: "Improve unit test coverage for core functions",
     status: "Review",
+    projectStatus: "Ongoing",
     priority: "Medium",
     assignee: mockUsers[1],
+    productOwner: mockUsers[0],
     tags: ["Testing"],
     deadline: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days from now
     createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(), // 15 days ago
     updatedAt: new Date().toISOString(),
+    scope: "Increase unit test coverage for core application functions",
+    activityLog: generateActivityLog("t8", mockUsers[1], new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()),
+    timeInStatus: generateTimeInStatus(),
   }
 ];
 
