@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, CalendarRange, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, CalendarRange, ChevronLeft, ChevronRight, History, Battery } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AppSidebarProps {
-  activeView: 'board' | 'timeline';
-  onViewChange: (view: 'board' | 'timeline') => void;
+  activeView: 'board' | 'timeline' | 'retrospective' | 'team-energy';
+  onViewChange: (view: 'board' | 'timeline' | 'retrospective' | 'team-energy') => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
 }
@@ -98,6 +98,42 @@ const AppSidebar = ({
                 "transition-all duration-300",
                 isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
               )}>Timeline</span>
+            </button>
+          </li>
+          <li>
+            <button
+              onClick={() => onViewChange('retrospective')}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+                activeView === 'retrospective' 
+                  ? "bg-primary text-primary-foreground" 
+                  : "hover:bg-gray-200 dark:hover:bg-gray-700"
+              )}
+              title="Retrospective"
+            >
+              <History size={18} />
+              <span className={cn(
+                "transition-all duration-300",
+                isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
+              )}>Retrospective</span>
+            </button>
+          </li>
+          <li>
+            <button
+              onClick={() => onViewChange('team-energy')}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+                activeView === 'team-energy' 
+                  ? "bg-primary text-primary-foreground" 
+                  : "hover:bg-gray-200 dark:hover:bg-gray-700"
+              )}
+              title="Team Energy"
+            >
+              <Battery size={18} />
+              <span className={cn(
+                "transition-all duration-300",
+                isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
+              )}>Team Energy</span>
             </button>
           </li>
         </ul>

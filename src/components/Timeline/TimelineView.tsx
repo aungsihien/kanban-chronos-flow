@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Task, TimeScale, User } from '../../types';
+import React, { useState, useRef } from 'react';
+import { Task, TimeScale, User, ThreadedComment } from '../../types';
 import { cn } from '../../lib/utils';
 import { Button } from '@/components/ui/button';
 import { quarters, getCurrentQuarter } from '../../data/mockData';
@@ -13,15 +13,23 @@ import {
 } from '@/components/ui/select';
 import { format, addDays, startOfQuarter, endOfQuarter, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO } from 'date-fns';
 import TaskDetail from '../UI/TaskDetail';
-import { ChevronRight, ChevronDown, X } from 'lucide-react';
+import { ChevronRight, ChevronDown, X, MessageCircle, Plus, Send } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Textarea } from '@/components/ui/textarea';
+import { v4 as uuidv4 } from 'uuid';
+import { useToast } from '@/components/ui/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 interface TimelineViewProps {
   tasks: Task[];
   users: User[];
+  currentUser?: User;
+  onAddComment?: (taskId: string, comment: ThreadedComment, isQuickComment?: boolean) => void;
+  onAddReply?: (taskId: string, parentId: string, reply: ThreadedComment) => void;
 }
 
-export const TimelineView = ({ tasks, users }: TimelineViewProps) => {
+export const TimelineView = ({ tasks, users, currentUser, onAddComment, onAddReply }: TimelineViewProps) => {
   const [scale, setScale] = useState<TimeScale>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentQuarter, setCurrentQuarter] = useState(getCurrentQuarter());
@@ -36,6 +44,11 @@ export const TimelineView = ({ tasks, users }: TimelineViewProps) => {
     'promotion': true,
   });
   const [showNotes, setShowNotes] = useState(true);
+  const [quickCommentTask, setQuickCommentTask] = useState<string | null>(null);
+  const [quickCommentText, setQuickCommentText] = useState('');
+  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
+  const { toast } = useToast();
   
   // Generate timeline units based on scale
   const generateTimelineUnits = () => {
@@ -134,6 +147,43 @@ export const TimelineView = ({ tasks, users }: TimelineViewProps) => {
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
     setDetailOpen(true);
+  };
+  
+  const handleQuickCommentOpen = (e: React.MouseEvent, taskId: string) => {
+    e.stopPropagation(); // Prevent task click
+    e.preventDefault(); // Prevent any default behavior
+    setQuickCommentTask(taskId);
+    setQuickCommentText('');
+    // Focus the textarea after popover opens
+    setTimeout(() => {
+      if (commentInputRef.current) {
+        commentInputRef.current.focus();
+      }
+    }, 100);
+  };
+  
+  const handleAddQuickComment = () => {
+    if (!quickCommentTask || !currentUser || !onAddComment || quickCommentText.trim() === '') return;
+    
+    const comment: ThreadedComment = {
+      id: uuidv4(),
+      taskId: quickCommentTask,
+      content: quickCommentText,
+      timestamp: new Date().toISOString(),
+      user: currentUser,
+      replies: [],
+    };
+    
+    onAddComment(quickCommentTask, comment, true); // Pass true to indicate this is a quick comment
+    setQuickCommentTask(null);
+    setQuickCommentText('');
+    setOpenPopoverId(null); // Close the popover
+    
+    toast({
+      title: "Comment Added",
+      description: "Your comment has been added to the task",
+      duration: 2000,
+    });
   };
   
   // Group tasks by section (using scope or tags)
@@ -346,12 +396,122 @@ export const TimelineView = ({ tasks, users }: TimelineViewProps) => {
                     title={`${task.title} (Due: ${format(new Date(task.deadline), "MMM d")})`}
                     onClick={() => handleTaskClick(task)}
                   >
-                    <span className="truncate flex-1">
-                      {scale === 'day' ? task.title.substring(0, 10) + '...' : task.title}
-                    </span>
-                    {task.assignee && scale !== 'day' && (
-                      <ProfileBadge user={task.assignee} size="sm" showTooltip={true} />
-                    )}
+                    <div className="flex items-center justify-between w-full">
+                      <span className="truncate flex-1">
+                        {scale === 'day' ? task.title.substring(0, 10) + '...' : task.title}
+                      </span>
+                      
+                      <div className="flex items-center gap-1">
+                        {/* Comment indicator */}
+                        {task.comments && task.comments.length > 0 && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                                  <MessageCircle className="h-3 w-3 text-gray-600 dark:text-gray-300" />
+                                  <span className="ml-0.5 text-[10px]">{task.comments.length}</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{task.comments.length} comment{task.comments.length !== 1 ? 's' : ''}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                        
+                        {/* Quick comment button */}
+                        {currentUser && onAddComment && (
+                          <Popover
+                            open={openPopoverId === task.id}
+                            onOpenChange={(open) => {
+                              if (open) {
+                                setOpenPopoverId(task.id);
+                                setQuickCommentTask(task.id);
+                                setQuickCommentText('');
+                                // Focus the textarea after popover opens
+                                setTimeout(() => {
+                                  if (commentInputRef.current) {
+                                    commentInputRef.current.focus();
+                                  }
+                                }, 100);
+                              } else {
+                                setOpenPopoverId(null);
+                              }
+                            }}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-4 w-4 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 p-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                }}
+                              >
+                                <Plus className="h-3 w-3 text-gray-600 dark:text-gray-300" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent 
+                              className="w-72" 
+                              align="start" 
+                              side="bottom"
+                              onInteractOutside={(e) => {
+                                // Only close if clicking outside the popover
+                                // Don't close when interacting with the content
+                                e.preventDefault();
+                              }}
+                              onClick={(e) => {
+                                // Prevent click from propagating to task item
+                                e.stopPropagation();
+                              }}
+                            >
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-medium">Add Quick Comment</h4>
+                                <Textarea 
+                                  ref={commentInputRef}
+                                  placeholder="Type your comment here..."
+                                  className="min-h-[80px] text-sm"
+                                  value={quickCommentText}
+                                  onChange={(e) => setQuickCommentText(e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onFocus={(e) => e.stopPropagation()}
+                                />
+                                <div className="flex justify-end gap-2">
+                                  <Button 
+                                    variant="outline"
+                                    size="sm" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setQuickCommentTask(null);
+                                      setOpenPopoverId(null); // Close the popover
+                                    }}
+                                    className="flex items-center gap-1"
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAddQuickComment();
+                                    }}
+                                    disabled={quickCommentText.trim() === ''}
+                                    className="flex items-center gap-1"
+                                  >
+                                    <Send className="h-3 w-3" />
+                                    Add
+                                  </Button>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                        
+                        {task.assignee && scale !== 'day' && (
+                          <ProfileBadge user={task.assignee} size="sm" showTooltip={true} />
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -364,7 +524,10 @@ export const TimelineView = ({ tasks, users }: TimelineViewProps) => {
       <TaskDetail 
         task={selectedTask} 
         open={detailOpen} 
-        onOpenChange={setDetailOpen} 
+        onOpenChange={setDetailOpen}
+        onAddComment={onAddComment}
+        onAddReply={onAddReply}
+        currentUser={currentUser}
       />
     </div>
   );

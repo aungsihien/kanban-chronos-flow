@@ -112,14 +112,14 @@ export const RetrospectiveView = ({
               Create Retrospective
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl max-h-[90vh] bg-white dark:bg-gray-800 overflow-hidden flex flex-col">
+          <DialogContent className="max-w-3xl max-h-[90vh] bg-white dark:bg-gray-800">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold">Team Retrospective</DialogTitle>
               <p className="text-gray-500 dark:text-gray-400 mt-2">Capture learnings, challenges, and successes for {currentPeriod}</p>
             </DialogHeader>
-            <div className="flex-1 overflow-hidden">
-              <ScrollArea className="h-[60vh]">
-                <div className="grid gap-4 p-6">
+            <div className="py-4 px-1">
+              <ScrollArea className="h-[60vh] pr-4">
+                <div className="grid gap-4 px-3">
                   <div>
                     <h3 className="text-lg font-medium mb-2 flex items-center gap-2">
                       <CheckCircle className="h-5 w-5 text-green-500" />

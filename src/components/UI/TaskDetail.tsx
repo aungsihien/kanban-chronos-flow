@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import "./smooth-scroll.css";
 import { Task, ActivityLogEntry, ThreadedComment, User } from "@/types";
 import { format, differenceInDays } from "date-fns";
 import {
@@ -17,8 +18,9 @@ import { tagColorMap, priorityColorMap } from "@/data/mockData";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
-import { AlertCircle, Clock, RefreshCw } from "lucide-react";
+import { AlertCircle, Clock, RefreshCw, MessageCircle } from "lucide-react";
 import ThreadedComments from "./ThreadedComments";
+import { v4 as uuidv4 } from "uuid";
 
 interface TaskDetailProps {
   task: Task | null;
@@ -30,7 +32,54 @@ interface TaskDetailProps {
 }
 
 const TaskDetail = ({ task, open, onOpenChange, onAddComment, onAddReply, currentUser }: TaskDetailProps) => {
-  if (!task) return null;
+  // Local state to track comments and ensure immediate updates
+  const [localTask, setLocalTask] = useState<Task | null>(task);
+  
+  // Update local task when the task prop changes
+  useEffect(() => {
+    setLocalTask(task);
+  }, [task]);
+  
+  // Local handlers for comments to update both local and parent state
+  const handleLocalAddComment = (taskId: string, comment: ThreadedComment) => {
+    // Update local state immediately
+    setLocalTask(prevTask => {
+      if (!prevTask) return null;
+      
+      return {
+        ...prevTask,
+        comments: [...(prevTask.comments || []), comment]
+      };
+    });
+    
+    // Update parent state
+    if (onAddComment) {
+      onAddComment(taskId, comment);
+    }
+  };
+  
+  const handleLocalAddReply = (taskId: string, parentId: string, reply: ThreadedComment) => {
+    // Update local state immediately
+    setLocalTask(prevTask => {
+      if (!prevTask) return null;
+      
+      return {
+        ...prevTask,
+        comments: (prevTask.comments || []).map(comment => 
+          comment.id === parentId 
+            ? { ...comment, replies: [...comment.replies, reply] }
+            : comment
+        )
+      };
+    });
+    
+    // Update parent state
+    if (onAddReply) {
+      onAddReply(taskId, parentId, reply);
+    }
+  };
+  
+  if (!localTask) return null;
 
   const formatTimestamp = (timestamp: string) => {
     return format(new Date(timestamp), "MMM d, yyyy 'at' h:mm a");
@@ -94,7 +143,14 @@ const TaskDetail = ({ task, open, onOpenChange, onAddComment, onAddReply, curren
           <TabsList className="mb-2">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="activity">Activity Log</TabsTrigger>
-            <TabsTrigger value="comments">Comments</TabsTrigger>
+            <TabsTrigger value="comments" className="flex items-center gap-1">
+              <MessageCircle className="h-4 w-4" />
+              Comments {task.comments && task.comments.length > 0 && (
+                <span className="ml-1 text-xs bg-primary text-primary-foreground rounded-full px-1.5 py-0.5">
+                  {task.comments.length}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="time">Time Intelligence</TabsTrigger>
           </TabsList>
 
@@ -245,13 +301,14 @@ const TaskDetail = ({ task, open, onOpenChange, onAddComment, onAddReply, curren
           <TabsContent value="comments" className="flex-1 overflow-hidden">
             <ScrollArea className="h-[calc(100vh-300px)]">
               <div className="p-1">
-                {currentUser && onAddComment && onAddReply ? (
+                {currentUser ? (
                   <ThreadedComments
-                    comments={task.comments || []}
-                    taskId={task.id}
+                    comments={localTask.comments || []}
+                    taskId={localTask.id}
                     currentUser={currentUser}
-                    onAddComment={(comment) => onAddComment(task.id, comment)}
-                    onAddReply={(parentId, reply) => onAddReply(task.id, parentId, reply)}
+                    activityLog={localTask.activityLog}
+                    onAddComment={(comment) => handleLocalAddComment(localTask.id, comment)}
+                    onAddReply={(parentId, reply) => handleLocalAddReply(localTask.id, parentId, reply)}
                   />
                 ) : (
                   <div className="text-center p-4 text-gray-500">

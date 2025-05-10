@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { KanbanColumn, Task, Status } from '../../types';
+import React, { useState, useRef } from 'react';
+import { KanbanColumn, Task, Status, ThreadedComment, User } from '../../types';
 import { cn } from '../../lib/utils';
 import {
   Card,
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, MessageCircle, Send, Plus } from 'lucide-react';
 import ProfileBadge from '../UI/ProfileBadge';
 import { tagColorMap, priorityColorMap } from '../../data/mockData';
 import { format } from 'date-fns';
@@ -20,17 +20,25 @@ import { useToast } from '@/components/ui/use-toast';
 import TaskDetail from '../UI/TaskDetail';
 import TaskMoveConfirmation from '../UI/TaskMoveConfirmation';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { v4 as uuidv4 } from 'uuid';
 
 interface KanbanBoardProps {
   columns: KanbanColumn[];
   tasks: Task[];
   onTaskMove: (taskId: string, newStatus: Status, comment?: string) => void;
+  onAddComment?: (taskId: string, comment: ThreadedComment, isQuickComment?: boolean) => void;
+  currentUser?: User;
 }
 
 export const KanbanBoard = ({
   columns,
   tasks,
   onTaskMove,
+  onAddComment,
+  currentUser,
 }: KanbanBoardProps) => {
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<Status | null>(null);
@@ -38,6 +46,10 @@ export const KanbanBoard = ({
   const [detailOpen, setDetailOpen] = useState(false);
   const [moveConfirmOpen, setMoveConfirmOpen] = useState(false);
   const [moveToStatus, setMoveToStatus] = useState<Status | null>(null);
+  const [quickCommentTask, setQuickCommentTask] = useState<string | null>(null);
+  const [quickCommentText, setQuickCommentText] = useState('');
+  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
@@ -73,6 +85,43 @@ export const KanbanBoard = ({
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
     setDetailOpen(true);
+  };
+  
+  const handleQuickCommentOpen = (e: React.MouseEvent, taskId: string) => {
+    e.stopPropagation(); // Prevent card click
+    e.preventDefault(); // Prevent any default behavior
+    setQuickCommentTask(taskId);
+    setQuickCommentText('');
+    // Focus the textarea after popover opens
+    setTimeout(() => {
+      if (commentInputRef.current) {
+        commentInputRef.current.focus();
+      }
+    }, 100);
+  };
+  
+  const handleAddQuickComment = () => {
+    if (!quickCommentTask || !currentUser || !onAddComment || quickCommentText.trim() === '') return;
+    
+    const comment: ThreadedComment = {
+      id: uuidv4(),
+      taskId: quickCommentTask,
+      content: quickCommentText,
+      timestamp: new Date().toISOString(),
+      user: currentUser,
+      replies: [],
+    };
+    
+    onAddComment(quickCommentTask, comment, true); // Pass true to indicate this is a quick comment
+    setQuickCommentTask(null);
+    setQuickCommentText('');
+    setOpenPopoverId(null); // Close the popover
+    
+    toast({
+      title: "Comment Added",
+      description: "Your comment has been added to the task",
+      duration: 2000,
+    });
   };
   
   const handleMoveConfirm = (taskId: string, newStatus: Status, comment: string) => {
@@ -193,14 +242,120 @@ export const KanbanBoard = ({
                   </CardContent>
                   <Separator />
                   <CardFooter className="p-3 flex justify-between items-center">
-                    <div className="text-xs text-gray-500">
+                    <div className="flex items-center gap-2">
                       {task.deadline && (
-                        <div className="flex items-center">
+                        <div className="flex items-center text-xs text-gray-500">
                           <span className="mr-1">📅</span>
                           {format(new Date(task.deadline), "MMM d")}
                         </div>
                       )}
+                      
+                      {/* Comment indicator with count */}
+                      {task.comments && task.comments.length > 0 && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center text-xs text-gray-500">
+                                <MessageCircle className="h-3 w-3 mr-1" />
+                                <span>{task.comments.length}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{task.comments.length} comment{task.comments.length !== 1 ? 's' : ''}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      
+                      {/* Quick comment button */}
+                      {currentUser && onAddComment && (
+                        <Popover 
+                          open={openPopoverId === task.id}
+                          onOpenChange={(open) => {
+                            if (open) {
+                              setOpenPopoverId(task.id);
+                              setQuickCommentTask(task.id);
+                              setQuickCommentText('');
+                              // Focus the textarea after popover opens
+                              setTimeout(() => {
+                                if (commentInputRef.current) {
+                                  commentInputRef.current.focus();
+                                }
+                              }, 100);
+                            } else {
+                              setOpenPopoverId(null);
+                            }
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-5 w-5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                            >
+                              <Plus className="h-3 w-3 text-gray-500" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent 
+                            className="w-72" 
+                            align="start" 
+                            side="bottom"
+                            onInteractOutside={(e) => {
+                              // Only close if clicking outside the popover
+                              // Don't close when interacting with the content
+                              e.preventDefault();
+                            }}
+                            onClick={(e) => {
+                              // Prevent click from propagating to card
+                              e.stopPropagation();
+                            }}
+                          >
+                            <div className="space-y-2">
+                              <h4 className="text-sm font-medium">Add Quick Comment</h4>
+                              <Textarea 
+                                ref={commentInputRef}
+                                placeholder="Type your comment here..."
+                                className="min-h-[80px] text-sm"
+                                value={quickCommentText}
+                                onChange={(e) => setQuickCommentText(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                onFocus={(e) => e.stopPropagation()}
+                              />
+                              <div className="flex justify-end gap-2">
+                                <Button 
+                                  variant="outline"
+                                  size="sm" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setQuickCommentTask(null);
+                                    setOpenPopoverId(null); // Close the popover
+                                  }}
+                                  className="flex items-center gap-1"
+                                >
+                                  Cancel
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddQuickComment();
+                                  }}
+                                  disabled={quickCommentText.trim() === ''}
+                                  className="flex items-center gap-1"
+                                >
+                                  <Send className="h-3 w-3" />
+                                  Add
+                                </Button>
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
                     </div>
+                    
                     {task.assignee && (
                       <ProfileBadge
                         user={task.assignee}
@@ -220,7 +375,12 @@ export const KanbanBoard = ({
       <TaskDetail 
         task={selectedTask} 
         open={detailOpen} 
-        onOpenChange={setDetailOpen} 
+        onOpenChange={setDetailOpen}
+        onAddComment={onAddComment}
+        onAddReply={(taskId, parentId, reply) => {
+          // Handle reply logic here if implemented in parent component
+        }}
+        currentUser={currentUser}
       />
       
       {/* Task Move Confirmation Dialog */}

@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { mockUsers, mockTasks, mockColumns, currentUser, quarters } from '../data/mockData';
-import { FilterState, Status, Task, User, ActivityLogEntry, Theme } from '../types';
+import { FilterState, Status, Task, User, ActivityLogEntry, Theme, RetrospectiveEntry, TeamEnergyIndicator as TeamEnergyType, ThreadedComment } from '../types';
 import Header from '../components/UI/Header';
 import FilterBar from '../components/UI/FilterBar';
 import KanbanBoard from '../components/Board/KanbanBoard';
 import TimelineView from '../components/Timeline/TimelineView';
+import { RetrospectiveView } from '../components/Timeline/RetrospectiveView';
+import TeamEnergyPage from './TeamEnergyPage';
 
 import LoginForm from '../components/Auth/LoginForm';
 import { useToast } from '@/components/ui/use-toast';
@@ -21,7 +23,21 @@ const Index = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [columns, setColumns] = useState(mockColumns);
-  const [filters, setFilters] = useState<FilterState>({
+  const [retrospectives, setRetrospectives] = useState<RetrospectiveEntry[]>([]);
+  // Separate filter states for Kanban and Timeline views
+  const [kanbanFilters, setKanbanFilters] = useState<FilterState>({
+    assignee: null,
+    priority: null,
+    tags: [],
+    search: '',
+    dateRange: {
+      start: null,
+      end: null,
+    },
+    source: null,
+  });
+  
+  const [timelineFilters, setTimelineFilters] = useState<FilterState>({
     assignee: null,
     priority: null,
     tags: [],
@@ -35,8 +51,9 @@ const Index = () => {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskFormOpen, setTaskFormOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>('light');
-  const [activeView, setActiveView] = useState<'board' | 'timeline'>('board');
+  const [activeView, setActiveView] = useState<'board' | 'timeline' | 'retrospective' | 'team-energy'>('board');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [currentPeriod, setCurrentPeriod] = useState<string>(typeof quarters[0] === 'string' ? quarters[0] : `Q${quarters[0].startMonth/3 + 1} ${new Date().getFullYear()}`);
   const { toast } = useToast();
   
   // Initialize theme from localStorage
@@ -65,7 +82,8 @@ const Index = () => {
 
   // Clear all filters
   const clearFilters = () => {
-    setFilters({
+    // Clear filters based on active view
+    const emptyFilters = {
       assignee: null,
       priority: null,
       tags: [],
@@ -74,7 +92,18 @@ const Index = () => {
         start: null,
         end: null,
       },
-    });
+      source: null,
+    };
+    
+    if (activeView === 'board') {
+      setKanbanFilters(emptyFilters);
+    } else if (activeView === 'timeline') {
+      setTimelineFilters(emptyFilters);
+    } else {
+      // Clear both when in retrospective view
+      setKanbanFilters(emptyFilters);
+      setTimelineFilters(emptyFilters);
+    }
   };
 
   // Task movement handler for drag and drop with activity logging
@@ -139,42 +168,50 @@ const Index = () => {
     setColumns(newColumns);
   };
 
-  // Filter tasks based on current filter settings
+  // Get the active filters based on current view
+  const getActiveFilters = () => {
+    return activeView === 'board' ? kanbanFilters : timelineFilters;
+  };
+
+  // Filter tasks based on current filter settings and active view
   const filteredTasks = tasks.filter(task => {
+    // Get the appropriate filters based on active view
+    const activeFilters = getActiveFilters();
+    
     // Filter by assignee
-    if (filters.assignee && (!task.assignee || task.assignee.id !== filters.assignee)) {
+    if (activeFilters.assignee && (!task.assignee || task.assignee.id !== activeFilters.assignee)) {
       return false;
     }
 
     // Filter by priority
-    if (filters.priority && task.priority !== filters.priority) {
+    if (activeFilters.priority && task.priority !== activeFilters.priority) {
       return false;
     }
 
     // Filter by tags (any match)
-    if (filters.tags.length > 0 && !filters.tags.some(tag => task.tags.includes(tag))) {
+    if (activeFilters.tags.length > 0 && !activeFilters.tags.some(tag => task.tags.includes(tag))) {
       return false;
     }
 
     // Filter by search term
     if (
-      filters.search &&
-      !task.title.toLowerCase().includes(filters.search.toLowerCase()) &&
-      !task.description.toLowerCase().includes(filters.search.toLowerCase())
+      activeFilters.search &&
+      !task.title.toLowerCase().includes(activeFilters.search.toLowerCase()) &&
+      !task.description.toLowerCase().includes(activeFilters.search.toLowerCase())
     ) {
       return false;
     }
 
     // Filter by date range
-    if (filters.dateRange.start || filters.dateRange.end) {
+    if (activeFilters.dateRange.start || activeFilters.dateRange.end) {
       const taskDate = new Date(task.deadline);
       
-      if (filters.dateRange.start && taskDate < filters.dateRange.start) {
+      if (activeFilters.dateRange.start && taskDate < activeFilters.dateRange.start) {
         return false;
       }
       
-      if (filters.dateRange.end) {
-        const endDate = new Date(filters.dateRange.end);
+      if (activeFilters.dateRange.end) {
+        const endDate = new Date(activeFilters.dateRange.end);
         endDate.setHours(23, 59, 59, 999); // End of day
         if (taskDate > endDate) {
           return false;
@@ -207,6 +244,101 @@ const Index = () => {
     }
   };
   
+  // Handle adding a comment to a task
+  const handleAddComment = (taskId: string, comment: ThreadedComment, isQuickComment: boolean = false) => {
+    setTasks(prevTasks => {
+      return prevTasks.map(task => {
+        if (task.id === taskId) {
+          // Add the comment to the task's comments array
+          const updatedComments = [...(task.comments || []), comment];
+          
+          // For quick comments, we don't want to create an activity log entry
+          // This ensures quick comments only appear under the Comments tab
+          if (isQuickComment) {
+            return {
+              ...task,
+              comments: updatedComments
+            };
+          } else {
+            // For regular comments, create an activity log entry
+            const activityEntry: ActivityLogEntry = {
+              id: uuidv4(),
+              taskId: taskId,
+              timestamp: new Date().toISOString(),
+              type: 'comment',
+              comment: comment.content,
+              user: comment.user
+            };
+            
+            return {
+              ...task,
+              comments: updatedComments,
+              activityLog: [...task.activityLog, activityEntry]
+            };
+          }
+        }
+        return task;
+      });
+    });
+    
+    toast({
+      title: "Comment Added",
+      description: "Your comment has been added to the task.",
+      duration: 2000,
+    });
+  };
+  
+  // Handle adding a reply to a comment
+  const handleAddReply = (taskId: string, parentId: string, reply: ThreadedComment) => {
+    setTasks(prevTasks => {
+      return prevTasks.map(task => {
+        if (task.id === taskId) {
+          // Find the parent comment and add the reply
+          const updatedComments = task.comments?.map(comment => {
+            if (comment.id === parentId) {
+              return {
+                ...comment,
+                replies: [...comment.replies, reply]
+              };
+            }
+            return comment;
+          }) || [];
+          
+          return {
+            ...task,
+            comments: updatedComments
+          };
+        }
+        return task;
+      });
+    });
+    
+    toast({
+      title: "Reply Added",
+      description: "Your reply has been added to the comment.",
+      duration: 2000,
+    });
+  };
+  
+  // Micro Update functionality has been removed
+  
+  // Handle creating a new retrospective
+  const handleCreateRetrospective = (retrospectiveData: Omit<RetrospectiveEntry, 'id' | 'createdAt'>) => {
+    const newRetrospective: RetrospectiveEntry = {
+      ...retrospectiveData,
+      id: uuidv4(),
+      createdAt: new Date().toISOString(),
+    };
+    
+    setRetrospectives([...retrospectives, newRetrospective]);
+    
+    toast({
+      title: "Retrospective Created",
+      description: "Your retrospective has been successfully created.",
+      duration: 3000,
+    });
+  };
+
   // Handle creating or updating a task
   const handleSaveTask = (taskData: Partial<Task>) => {
     if (taskData.id) {
@@ -304,30 +436,37 @@ const Index = () => {
         <main className="flex-1 overflow-auto p-6 transition-all duration-300 ease-in-out">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold">
-              {activeView === 'board' ? 'Kanban Board' : 'Timeline View'}
+              {activeView === 'board' ? 'Kanban Board' : 
+               activeView === 'timeline' ? 'Timeline View' : 
+               activeView === 'retrospective' ? 'Retrospective' : 
+               'Team Energy Indicator'}
             </h1>
-            <div className="flex items-center space-x-4">
-              <UnifiedSearch 
-                tasks={tasks} 
-                filters={filters} 
-                setFilters={setFilters} 
-                onTaskSelect={handleTaskSelect} 
-              />
-              <Button 
-                onClick={() => setTaskFormOpen(true)}
-                className="bg-primary text-white hover:bg-primary/90"
-              >
-                New Task
-              </Button>
-            </div>
+            {(activeView === 'board' || activeView === 'timeline') && (
+              <div className="flex items-center space-x-4">
+                <UnifiedSearch 
+                  tasks={tasks} 
+                  filters={activeView === 'board' ? kanbanFilters : timelineFilters} 
+                  setFilters={activeView === 'board' ? setKanbanFilters : setTimelineFilters} 
+                  onTaskSelect={handleTaskSelect} 
+                />
+                <Button 
+                  onClick={() => setTaskFormOpen(true)}
+                  className="bg-primary text-white hover:bg-primary/90"
+                >
+                  New Task
+                </Button>
+              </div>
+            )}
           </div>
           
-          <FilterBar 
-            filters={filters} 
-            setFilters={setFilters} 
-            users={mockUsers}
-            onClearFilters={clearFilters}
-          />
+          {activeView !== 'retrospective' && (
+            <FilterBar 
+              filters={activeView === 'board' ? kanbanFilters : timelineFilters} 
+              setFilters={activeView === 'board' ? setKanbanFilters : setTimelineFilters} 
+              users={mockUsers}
+              onClearFilters={clearFilters}
+            />
+          )}
           
           {/* Conditional rendering based on active view */}
           {activeView === 'board' ? (
@@ -335,14 +474,32 @@ const Index = () => {
               columns={filteredColumns} 
               tasks={filteredTasks} 
               onTaskMove={handleTaskMove}
+              onAddComment={handleAddComment}
+              currentUser={loggedInUser}
             />
-          ) : (
+          ) : activeView === 'timeline' ? (
             <div className="space-y-6">
-
               <TimelineView 
                 tasks={filteredTasks} 
-                users={mockUsers} 
+                users={mockUsers}
+                onAddComment={handleAddComment}
+                onAddReply={handleAddReply}
+                currentUser={loggedInUser}
               />
+            </div>
+          ) : activeView === 'retrospective' ? (
+            <div className="space-y-6">
+              <RetrospectiveView
+                tasks={filteredTasks}
+                users={mockUsers}
+                currentPeriod={currentPeriod}
+                retrospectives={retrospectives}
+                onCreateRetrospective={handleCreateRetrospective}
+              />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <TeamEnergyPage tasks={tasks} />
             </div>
           )}
           

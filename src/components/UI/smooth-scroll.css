@@ -1,0 +1,36 @@
+/* Smooth scrolling styles for ScrollArea components */
+.scrollarea-smooth {
+  scroll-behavior: smooth;
+}
+
+/* Apply smooth scrolling to all ScrollArea viewports */
+[data-radix-scroll-area-viewport] {
+  scroll-behavior: smooth !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+}
+
+/* Custom scrollbar styling */
+[data-radix-scroll-area-viewport]::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb {
+  background-color: rgba(155, 155, 155, 0.5);
+  border-radius: 4px;
+  border: 2px solid transparent;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(155, 155, 155, 0.8);
+}
+
+/* Add padding to improve spacing */
+.scrollarea-content {
+  padding-right: 8px;
+}
