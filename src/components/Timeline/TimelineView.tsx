@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Task, TimeScale, User, ThreadedComment } from '../../types';
+import { Task, TimeScale, User, ThreadedComment, PublicTimelineSettings } from '../../types';
 import { cn } from '../../lib/utils';
 import { Button } from '@/components/ui/button';
 import { quarters, getCurrentQuarter } from '../../data/mockData';
@@ -13,12 +13,13 @@ import {
 } from '@/components/ui/select';
 import { format, addDays, startOfQuarter, endOfQuarter, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, parseISO } from 'date-fns';
 import TaskDetail from '../UI/TaskDetail';
-import { ChevronRight, ChevronDown, X, MessageCircle, Plus, Send } from 'lucide-react';
+import { ChevronRight, ChevronDown, X, MessageCircle, Plus, Send, Share2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/components/ui/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import ShareTimelineDialog from './ShareTimelineDialog';
 
 
 interface TimelineViewProps {
@@ -47,8 +48,21 @@ export const TimelineView = ({ tasks, users, currentUser, onAddComment, onAddRep
   const [quickCommentTask, setQuickCommentTask] = useState<string | null>(null);
   const [quickCommentText, setQuickCommentText] = useState('');
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
+  const [publicTimelineSettings, setPublicTimelineSettings] = useState<PublicTimelineSettings[]>([]);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+  
+  // Handle creating a new public timeline
+  const handleCreatePublicTimeline = (settings: PublicTimelineSettings) => {
+    setPublicTimelineSettings(prev => [...prev, settings]);
+    
+    // In a real app, this would save to a database
+    toast({
+      title: "Public Timeline Created",
+      description: `Your timeline "${settings.title}" is now available via a shareable link.`,
+      duration: 3000,
+    });
+  };
   
   // Generate timeline units based on scale
   const generateTimelineUnits = () => {
@@ -292,6 +306,14 @@ export const TimelineView = ({ tasks, users, currentUser, onAddComment, onAddRep
         <h2 className="text-xl font-bold">Timeline View</h2>
         
         <div className="flex items-center space-x-2">
+          {currentUser && (
+            <ShareTimelineDialog 
+              tasks={tasks} 
+              currentUser={currentUser} 
+              onCreatePublicTimeline={handleCreatePublicTimeline} 
+            />
+          )}
+
           <Select value={scale} onValueChange={(value) => setScale(value as TimeScale)}>
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Time Scale" />

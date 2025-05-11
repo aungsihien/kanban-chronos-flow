@@ -8,6 +8,7 @@ import KanbanBoard from '../components/Board/KanbanBoard';
 import TimelineView from '../components/Timeline/TimelineView';
 import { RetrospectiveView } from '../components/Timeline/RetrospectiveView';
 import TeamEnergyPage from './TeamEnergyPage';
+import MainSettingsPanel from '../components/Settings/MainSettingsPanel';
 
 import LoginForm from '../components/Auth/LoginForm';
 import { useToast } from '@/components/ui/use-toast';
@@ -51,7 +52,7 @@ const Index = () => {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskFormOpen, setTaskFormOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>('light');
-  const [activeView, setActiveView] = useState<'board' | 'timeline' | 'retrospective' | 'team-energy'>('board');
+  const [activeView, setActiveView] = useState<'board' | 'timeline' | 'retrospective' | 'team-energy' | 'settings'>('board');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [currentPeriod, setCurrentPeriod] = useState<string>(typeof quarters[0] === 'string' ? quarters[0] : `Q${quarters[0].startMonth/3 + 1} ${new Date().getFullYear()}`);
   const { toast } = useToast();
@@ -439,6 +440,7 @@ const Index = () => {
               {activeView === 'board' ? 'Kanban Board' : 
                activeView === 'timeline' ? 'Timeline View' : 
                activeView === 'retrospective' ? 'Retrospective' : 
+               activeView === 'settings' ? 'Settings' :
                'Team Energy Indicator'}
             </h1>
             {(activeView === 'board' || activeView === 'timeline') && (
@@ -459,7 +461,7 @@ const Index = () => {
             )}
           </div>
           
-          {activeView !== 'retrospective' && (
+          {(activeView !== 'retrospective' && activeView !== 'settings') && (
             <FilterBar 
               filters={activeView === 'board' ? kanbanFilters : timelineFilters} 
               setFilters={activeView === 'board' ? setKanbanFilters : setTimelineFilters} 
@@ -496,6 +498,10 @@ const Index = () => {
                 retrospectives={retrospectives}
                 onCreateRetrospective={handleCreateRetrospective}
               />
+            </div>
+          ) : activeView === 'settings' ? (
+            <div className="space-y-6">
+              <MainSettingsPanel />
             </div>
           ) : (
             <div className="space-y-6">

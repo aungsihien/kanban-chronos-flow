@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, CalendarRange, ChevronLeft, ChevronRight, History, Battery } from 'lucide-react';
+import { LayoutDashboard, CalendarRange, ChevronLeft, ChevronRight, History, Battery, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import SettingsPanel from '../Settings/SettingsPanel';
 
 interface AppSidebarProps {
-  activeView: 'board' | 'timeline' | 'retrospective' | 'team-energy';
-  onViewChange: (view: 'board' | 'timeline' | 'retrospective' | 'team-energy') => void;
+  activeView: 'board' | 'timeline' | 'retrospective' | 'team-energy' | 'settings';
+  onViewChange: (view: 'board' | 'timeline' | 'retrospective' | 'team-energy' | 'settings') => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
 }
@@ -29,6 +30,8 @@ const AppSidebar = ({
       setInternalIsCollapsed(!internalIsCollapsed);
     }
   };
+  // No longer need local settings state since it's managed by the parent component
+  
   return (
     <div 
       className={cn(
@@ -136,8 +139,28 @@ const AppSidebar = ({
               )}>Team Energy</span>
             </button>
           </li>
+          <li className="mt-6">
+            <button
+              onClick={() => onViewChange('settings')}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
+                activeView === 'settings' 
+                  ? "bg-primary text-primary-foreground" 
+                  : "hover:bg-gray-200 dark:hover:bg-gray-700"
+              )}
+              title="Settings"
+            >
+              <Settings size={18} />
+              <span className={cn(
+                "transition-all duration-300",
+                isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
+              )}>Settings</span>
+            </button>
+          </li>
         </ul>
       </nav>
+
+      {/* Settings Panel no longer needed here as it's shown in the main content area */}
 
     </div>
   );

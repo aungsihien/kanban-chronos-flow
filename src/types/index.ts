@@ -11,12 +11,15 @@ export type ProjectStatus = 'Planned' | 'Ongoing' | 'Done';
 // Task tag types
 export type Tag = 'Bug' | 'Feature' | 'Documentation' | 'Research' | 'Design' | 'Testing';
 
+// Role type for user roles
+export type Role = 'Product Owner' | 'Product Manager' | 'Developer' | 'Tester' | 'Designer' | 'Stakeholder';
+
 // Profile/User type
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: Role | string;
   initials: string;
   color: string;
 }
@@ -156,6 +159,10 @@ export interface PublicTimelineSettings {
   expiresAt?: string;
   allowedFilters: boolean;
   visibleColumns: Status[];
+  hiddenTasks: string[]; // Array of task IDs to hide from public view
+  isPasswordProtected: boolean;
+  password?: string; // Optional password for protected views
+  isPublic: boolean; // Whether the timeline is currently public or private
 }
 
 // Time Intelligence Alert type
